@@ -1,0 +1,9 @@
+#signUp api
+POST  {{url_dev}}/shop/signup
+Content-Type: application/json
+
+{
+  "name": "Shop TIPS3",
+  "email": "shoptipsjs3@gmail.com",
+  "password": "abc123"
+}
