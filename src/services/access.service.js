@@ -2,8 +2,12 @@ const shopModel = require('../models/shop.model');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto')
 const KeyTokenService = require('./keyToken.service');
-const {createTokenPair} = require("../auth/authUtils");
+const {createTokenPair, verifyJWT} = require("../auth/authUtils");
 const {getInfoData} = require("../utils");
+const {BadRequestError, ConflictRequestError, AuthError, ForbiddenError} = require("../cores/error.response");
+const {findByEmail} = require("./shop.service");
+const {del} = require("express/lib/application");
+const {verify} = require("jsonwebtoken");
 
 const ROLES_SHOP = {
   SHOP: 'SHOP',
@@ -13,16 +17,86 @@ const ROLES_SHOP = {
 }
 
 class AccessService {
+
+  static handleRefreshToken = async ({refreshToken, user, keyStore}) => {
+    const {userId, email} = user
+
+    if (keyStore.refreshTokensUsed.includes(refreshToken)) {
+      await KeyTokenService.deleteKeyById(userId)
+      throw new ForbiddenError('Something went wrong, plese relogin')
+    }
+
+    if (keyStore.refreshToken !== refreshToken) {
+      throw new AuthError('Shop not registered')
+    }
+
+    const foundShop = await findByEmail({email: email})
+    if (!foundShop) {
+      throw new AuthError('Shop not registered')
+    }
+
+    const tokens = await createTokenPair({userId, email}, keyStore.publicKey, keyStore.privateKey)
+
+    await keyStore.updateOne({
+      $set: {
+        refreshToken: tokens.refreshToken
+      },
+      $addToSet: {
+        refreshTokensUsed: refreshToken
+      }
+    })
+
+    return {
+      user,
+      tokens
+    }
+  }
+
+  static logout = async (keyStore) => {
+    const delKey = await KeyTokenService.removeKeyById(keyStore._id)
+    console.log(`delKey::`, delKey)
+
+    return delKey
+  }
+
+  static login = async ({email, password, refreshToken = null}) => {
+    const foundShop = await findByEmail({email})
+    if (!foundShop) {
+      throw new BadRequestError('Shop not registered')
+    }
+
+    const match = bcrypt.compare(password, foundShop.password)
+    if (!match) {
+      throw new AuthError('Authentication error')
+    }
+
+    const privateKey = crypto.randomBytes(64).toString('hex')
+    const publicKey = crypto.randomBytes(64).toString('hex')
+
+    const tokens = await createTokenPair({userId: foundShop._id, email}, publicKey, privateKey);
+
+    await KeyTokenService.createKeyToken({
+      refreshToken: tokens.refreshToken,
+      privateKey: privateKey,
+      publicKey: publicKey,
+      userId: foundShop._id,
+    })
+    return {
+      shop: getInfoData({
+        fields: ['_id', 'name', 'email'],
+        object: foundShop
+      }),
+      tokens
+    }
+  }
+
   static signUp = async ({name, email, password}) => {
     try {
       // step1: check email exists
       const holderShop = await shopModel.findOne({ email }, null, { lean: true });
       if (holderShop) {
         console.log(`Shop already registered`)
-        return {
-          code: 'xxxx',
-          message: 'Shop already registered'
-        }
+        throw new BadRequestError('Error: Shop already registered')
       }
 
       const passwordHash = await bcrypt.hash(password, 10);
@@ -55,10 +129,7 @@ class AccessService {
         })
 
         if (!keyStore) {
-          return {
-            code: 'xxxx',
-            message: 'keyStore error'
-          }
+          throw new BadRequestError('keyStore error')
         }
 
         // create token pair
