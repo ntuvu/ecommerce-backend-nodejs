@@ -20,3 +20,4 @@ router.get('/drafts/all', asyncHandler(productController.findAllDraftsForShop))
 router.get('/published/all', asyncHandler(productController.findAllPublishForShop))
 
 module.exports = router
+
