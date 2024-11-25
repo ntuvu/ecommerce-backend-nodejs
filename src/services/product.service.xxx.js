@@ -4,6 +4,7 @@ const {findAllDraftsForShop, publishProductByShop, findAllPublishForShop, unPubl
   findAllProducts, findProduct, updateProductById
 } = require("../models/repos/product.repo");
 const {removeUndefinedObject, updateNestedObject} = require("../utils");
+const {insertInventory} = require("../models/repos/inventory.repo");
 
 class ProductFactory {
 
@@ -76,7 +77,16 @@ class Product {
   }
 
   async createProduct(productId) {
-    return await product.create({...this, _id: productId})
+    const newProduct = await product.create({...this, _id: productId})
+    if (newProduct) {
+      await insertInventory({
+        productId: newProduct._id,
+        shopId: this.product_shop,
+        stock: this.product_quantity
+      })
+    }
+
+    return newProduct
   }
 
   async updateProduct(productId, payload) {
