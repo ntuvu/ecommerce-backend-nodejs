@@ -86,6 +86,23 @@ const updateProductById = async ({productId, payload, model, isNew = true}) => {
   return await model.findByIdAndUpdate(productId, payload, {new: isNew})
 }
 
+const getProductById = async (productId) => {
+  return await product.findOne({_id: new Types.ObjectId(productId)}).lean()
+}
+
+const checkProductByServer = async (products) => {
+  return await Promise.all(products.map(async product => {
+    const foundProduct = await getProductById(product.productId)
+    if (foundProduct) {
+      return {
+        price: foundProduct.product.price,
+        quantity: product.quantity,
+        productId: product.productId
+      }
+    }
+  }))
+}
+
 module.exports = {
   findAllDraftsForShop,
   publishProductByShop,
@@ -94,5 +111,7 @@ module.exports = {
   searchProducts,
   findAllProducts,
   findProduct,
-  updateProductById
+  updateProductById,
+  getProductById,
+  checkProductByServer
 }

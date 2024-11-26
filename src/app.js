@@ -23,7 +23,7 @@ require('./dbs/init.mongodb')
 // const {checkOverload} = require('./helpers/check.connect')
 // checkOverload()
 
-// init router
+// init checkout
 app.use('/', require('./routers'))
 
 
