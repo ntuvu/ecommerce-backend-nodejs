@@ -36,7 +36,9 @@
 // lv2
 const dev = {
   app: {
-    port: process.env.DEV_APP_PORT || 3052
+    port: process.env.DEV_APP_PORT || 3052,
+    discord_token: process.env.DISCORD_TOKEN || 'This is discord token',
+    discord_channel_id: process.env.DISCORD_CHANNEL_ID || '',
   },
   db: {
     host: process.env.DEV_DB_HOST || 'localhost',

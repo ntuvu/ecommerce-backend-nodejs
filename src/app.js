@@ -23,6 +23,8 @@ require('./dbs/init.mongodb')
 // const {checkOverload} = require('./helpers/check.connect')
 // checkOverload()
 
+require('./loggers/discord.log')
+
 // init checkout
 app.use('/', require('./routers'))
 
