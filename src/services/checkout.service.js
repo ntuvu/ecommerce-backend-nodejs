@@ -2,6 +2,8 @@ const {findCardById} = require('../models/repos/card.repo')
 const {BadRequestError} = require("../cores/error.response");
 const {checkProductByServer} = require("../models/repos/product.repo");
 const DiscountService = require("./discount.service");
+const {acquireLock, releaseLock} = require("./redis.service");
+const order = require('../models/order.model')
 
 class CheckoutService {
   static async checkoutReview({
@@ -31,7 +33,7 @@ class CheckoutService {
         throw new BadRequestError('order wrong')
       }
 
-      const checkoutPrice = checkoutProductServer.reduce((acc, product) => {
+      const checkoutPrice = checkProductServer.reduce((acc, product) => {
         return acc + (product.quantity * product.price)
       }, 0)
 
@@ -85,9 +87,32 @@ class CheckoutService {
 
     const products = shop_order_ids_new.flatMap(order => order.products)
     console.log('product 1 ::', products)
+    const acquireProduct = []
     for (let i = 0; i < products.length; i++) {
       const {productId, quantity} = products[i]
+      const keyLock = await acquireLock(productId, quantity, cardId)
+      acquireProduct.push(keyLock ? true : false)
+      if (keyLock) {
+        await releaseLock(keyLock)
+      }
     }
+
+    if (acquireProduct.includes(false)) {
+      throw new BadRequestError('Some products has been updated, please go to your cart!')
+    }
+
+    const newOrder = await order.create({
+      order_userId: userId,
+      order_checkout: checkout_order,
+      order_shipping: user_address,
+      order_products: shop_order_ids_new
+    })
+
+    if (newOrder) {
+
+    }
+
+    return newOrder
   }
 }
 

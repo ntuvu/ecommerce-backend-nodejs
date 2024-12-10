@@ -18,6 +18,9 @@ app.use(express.urlencoded({
   extended: true
 }))
 
+require('./test/inventory.test.service')
+
+
 // init db
 require('./dbs/init.mongodb')
 // const {checkOverload} = require('./helpers/check.connect')
