@@ -5,6 +5,7 @@ const {findAllDraftsForShop, publishProductByShop, findAllPublishForShop, unPubl
 } = require("../models/repos/product.repo");
 const {removeUndefinedObject, updateNestedObject} = require("../utils");
 const {insertInventory} = require("../models/repos/inventory.repo");
+const {pushNotiToSystem} = require("./notification.service");
 
 class ProductFactory {
 
@@ -84,6 +85,18 @@ class Product {
         shopId: this.product_shop,
         stock: this.product_quantity
       })
+      // push noti to system collection
+      pushNotiToSystem({
+        type: 'SHOP-001',
+        receivedId: 1,
+        senderId: this.product_shop,
+        options: {
+          product_name: this.product_name,
+          shop_name: this.product_shop
+        }
+      })
+          .then(res => console.log(rs))
+          .catch(console.error)
     }
 
     return newProduct

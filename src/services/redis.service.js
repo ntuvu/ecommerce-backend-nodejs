@@ -1,43 +1,80 @@
 const redis = require('redis')
-const {promisify} = require('util')
-const {reservationInventory} = require("../models/repos/inventory.repo");
 
 const redisClient = redis.createClient()
-
-const pexpire = promisify(redisClient.pexpire).bind(redisClient)
-const setnxAsync = promisify(redisClient.setnx).bind(redisClient)
 
 const acquireLock = async (productId, quantity, cardId) => {
   const key = `lock_v2023_${productId}`
   const retryTimes = 10
   const expireTime = 3000 // 3s
 
-  for (let i = 0; i < retryTimes; i++) {
-    const result = await setnxAsync(key, expireTime)
-    console.log(`result::`, result)
-    if (result === 1) {
-      const isReservation = await reservationInventory({
-        productId, quantity, cardId
+  try {
+    // Ensure the client is connected
+    if (!redisClient.isOpen) {
+      await redisClient.connect()
+    }
+
+    for (let i = 0; i < retryTimes; i++) {
+      const result = await redisClient.set(key, 'lock', {
+        NX: true,  // Only set if key doesn't exist
+        PX: expireTime  // Expire in milliseconds
       })
 
-      if (isReservation.modifiedCount) {
-        await pexpire(key, expireTime)
-        return key
-      }
+      console.log(`result::`, result)
 
-      return key
-    } else {
-      await new Promise(resolve => setTimeout(resolve, 50))
+      if (result === true) {
+        const isReservation = await reservationInventory({
+          productId, quantity, cardId
+        })
+
+        if (isReservation.modifiedCount) {
+          return key
+        }
+
+        return key
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 50))
+      }
     }
+  } catch (error) {
+    console.error('Redis lock error:', error)
+    throw error
   }
 }
 
 const releaseLock = async (keyLock) => {
-  const delAsyncKey = promisify(redisClient.del).bind(redisClient)
-  return await delAsyncKey(keyLock)
+  try {
+    // Ensure the client is connected
+    if (!redisClient.isOpen) {
+      await redisClient.connect()
+    }
+
+    return await redisClient.del(keyLock)
+  } catch (error) {
+    console.error('Redis unlock error:', error)
+    throw error
+  }
+}
+
+// Ensure connection is established and closed properly
+const initializeRedis = async () => {
+  try {
+    await redisClient.connect()
+  } catch (error) {
+    console.error('Redis connection error:', error)
+  }
+}
+
+const closeRedis = async () => {
+  try {
+    await redisClient.quit()
+  } catch (error) {
+    console.error('Redis disconnection error:', error)
+  }
 }
 
 module.exports = {
   acquireLock,
-  releaseLock
+  releaseLock,
+  initializeRedis,
+  closeRedis
 }

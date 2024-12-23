@@ -11,6 +11,9 @@ router.use(apiKey)
 // check permission
 router.use(permission('0000'))
 
+router.use('/v1/api/notification', require('./notification'))
+
+
 router.use('/v1/api/comment', require('./comment'))
 
 router.use('/v1/api/innventory', require('./innventory'))
